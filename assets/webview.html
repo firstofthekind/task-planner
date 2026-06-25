@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Timers</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f3f4f6; padding: 16px; margin: 0; }
+    .task-list { display: flex; flex-direction: column; gap: 12px; }
+    .task-item {
+      background: white; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      display: flex; justify-content: space-between; align-items: center; cursor: grab;
+    }
+    .task-item.dragging { opacity: 0.5; background: #e5e7eb; }
+    .info { flex: 1; }
+    .name { font-weight: 600; margin-bottom: 4px; color: #111827; }
+    .time { font-family: ui-monospace, monospace; font-size: 1.25rem; color: #4b5563; }
+    .controls button {
+      padding: 8px 16px; margin-left: 8px; border: none; border-radius: 6px;
+      font-weight: 600; cursor: pointer; transition: background 0.2s;
+    }
+    .controls button.start { background: #10b981; color: white; }
+    .controls button.pause { background: #f59e0b; color: white; }
+    .controls button.reset { background: #e5e7eb; color: #374151; }
+    .controls button:disabled { background: #d1d5db; color: #9ca3af; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="task-list" id="taskList"></div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const tasks = JSON.parse(decodeURIComponent(urlParams.get('data') || '[]'));
+    const taskListEl = document.getElementById('taskList');
+    const timers = {};
+
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const s = (seconds % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function playAlertSound() {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.5); // 0.5 second beep
+    }
+
+    function toggleTimer(id) {
+      const t = timers[id];
+      const btn = document.getElementById(`btn-${id}`);
+      
+      if (t.interval) {
+        clearInterval(t.interval);
+        t.interval = null;
+        btn.textContent = 'Start';
+        btn.className = 'start';
+      } else {
+        btn.textContent = 'Pause';
+        btn.className = 'pause';
+        t.interval = setInterval(() => {
+          if (t.timeLeft > 0) {
+            t.timeLeft--;
+            document.getElementById(`time-${id}`).textContent = formatTime(t.timeLeft);
+            if (t.timeLeft === 0) {
+              clearInterval(t.interval);
+              t.interval = null;
+              btn.textContent = 'Done';
+              btn.disabled = true;
+              btn.className = '';
+              playAlertSound();
+            }
+          }
+        }, 1000);
+      }
+    }
+
+    function resetTimer(id) {
+      const t = timers[id];
+      if (t.interval) {
+        clearInterval(t.interval);
+        t.interval = null;
+      }
+      t.timeLeft = t.duration * 60;
+      document.getElementById(`time-${id}`).textContent = formatTime(t.timeLeft);
+      const btn = document.getElementById(`btn-${id}`);
+      btn.textContent = 'Start';
+      btn.className = 'start';
+      btn.disabled = false;
+    }
+
+    let draggedItem = null;
+
+    function renderTasks() {
+      tasks.forEach((task, index) => {
+        timers[task.id] = { duration: task.duration_minutes, timeLeft: task.duration_minutes * 60, interval: null };
+        
+        const el = document.createElement('div');
+        el.className = 'task-item';
+        el.draggable = true;
+        
+        el.innerHTML = `
+          <div class="info">
+            <div class="name">${task.name}</div>
+            <div class="time" id="time-${task.id}">${formatTime(timers[task.id].timeLeft)}</div>
+          </div>
+          <div class="controls">
+            <button id="btn-${task.id}" class="start" onclick="toggleTimer('${task.id}')">Start</button>
+            <button class="reset" onclick="resetTimer('${task.id}')">Reset</button>
+          </div>
+        `;
+
+        el.addEventListener('dragstart', function() {
+          draggedItem = this;
+          setTimeout(() => this.classList.add('dragging'), 0);
+        });
+        
+        el.addEventListener('dragend', function() {
+          this.classList.remove('dragging');
+          draggedItem = null;
+        });
+        
+        el.addEventListener('dragover', e => e.preventDefault());
+        
+        el.addEventListener('drop', function() {
+          if (this !== draggedItem) {
+            const children = Array.from(taskListEl.children);
+            const draggedIdx = children.indexOf(draggedItem);
+            const targetIdx = children.indexOf(this);
+            taskListEl.insertBefore(draggedItem, draggedIdx < targetIdx ? this.nextSibling : this);
+          }
+        });
+
+        taskListEl.appendChild(el);
+      });
+    }
+
+    renderTasks();
+  </script>
+</body>
+</html>

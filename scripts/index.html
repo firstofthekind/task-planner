@@ -1,0 +1,23 @@
+<script>
+  window['ai_edge_gallery_get_result'] = async (dataStr) => {
+    try {
+      const data = JSON.parse(dataStr);
+      if (!data || !data.tasks || !Array.isArray(data.tasks)) {
+        throw new Error("Invalid payload: Missing tasks array.");
+      }
+      
+      // Pass the extracted tasks directly to the webview via URL query parameters
+      const encodedData = encodeURIComponent(JSON.stringify(data.tasks));
+      
+      return JSON.stringify({
+        result: "Interactive timer dashboard initialized successfully.",
+        webview: {
+          url: `webview.html?data=${encodedData}`,
+          aspectRatio: 1.5
+        }
+      });
+    } catch (e) {
+      return JSON.stringify({ error: e.message });
+    }
+  };
+</script>
