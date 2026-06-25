@@ -1,4 +1,3 @@
-```
 ---
 name: Task Planner & Timer
 description: Automatically plans user tasks, estimates their durations, and generates an interactive timer dashboard.
@@ -15,4 +14,3 @@ You are a highly efficient task planning assistant. When a user provi
   ]
 }
 Do not output any conversational text before or after calling the tool.
-```
